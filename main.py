@@ -60,11 +60,9 @@ SESSION_TIMEOUT = 1800  # 30 minutes
 
 
 
-def build_text(session_id, prediction):
-    """
-    Build text from recognized signs.
-    Check spelling when a word is completed.
-    """
+
+def build_text(session_id, prediction, name_mode=False):
+    """Build text and autocorrect completed words."""
 
     try:
         session_id = str(UUID(session_id))
@@ -77,7 +75,6 @@ def build_text(session_id, prediction):
     with word_lock:
         now = time.monotonic()
 
-        # Remove expired sessions
         for sid, last_seen in list(session_last_seen.items()):
             if now - last_seen > SESSION_TIMEOUT:
                 word_sessions.pop(sid, None)
@@ -89,10 +86,8 @@ def build_text(session_id, prediction):
         session_last_seen[session_id] = now
 
         interpreter = word_sessions[session_id]
-
         previous_text = interpreter.text
 
-        # Add the real AI prediction to the text
         text_result = interpreter.update(
             prediction["label"],
             hand_detected=prediction["hand_detected"]
@@ -101,8 +96,7 @@ def build_text(session_id, prediction):
         current_text = text_result["text"]
         correction_result = None
 
-        # A newly accepted SPACE means a word
-        # has just been completed.
+        # Autocorrect only after a new SPACE sign.
         word_completed = (
             text_result["accepted"]
             and current_text.endswith(" ")
@@ -116,71 +110,21 @@ def build_text(session_id, prediction):
             if words:
                 completed_word = words[-1]
 
-                correction_result = (
-                    autocorrect.check_word(
-                        completed_word
-                    )
+                correction_result = autocorrect.check_word(
+                    completed_word,
+                    name_mode=name_mode
                 )
-                
-                
-                # Automatically apply simple spelling corrections
-                if (
-                    correction_result["status"] == "review"
-                    and correction_result["suggestion"]
-                ):
-                    original = completed_word
-                    suggestion = correction_result["suggestion"]
 
-                    # Check whether the correction is a simple typo
-                    original_upper = original.upper()
-                    suggestion_upper = suggestion.upper()
-
-                    same_length = len(original_upper) == len(suggestion_upper)
-
-                    # Example: RELLO -> HELLO
-                    one_wrong_letter = (
-                        same_length
-                        and sum(
-                            a != b
-                            for a, b in zip(original_upper, suggestion_upper)
-                        ) == 1
+                if correction_result["status"] == "applied":
+                    interpreter.text = (
+                        current_text[:-(len(completed_word) + 1)]
+                        + correction_result["corrected"]
+                        + " "
                     )
 
-                    # Example: WROLD -> WORLD
-                    swapped_letters = (
-                        same_length
-                        and any(
-                            original_upper[:i]
-                            + original_upper[i + 1]
-                            + original_upper[i]
-                            + original_upper[i + 2:]
-                            == suggestion_upper
-                            for i in range(len(original_upper) - 1)
-                        )
+                    text_result = interpreter.get_result(
+                        text_result["accepted"]
                     )
-
-                    frequency = autocorrect.spell.word_frequency[
-                        suggestion.lower()
-                    ]
-
-                    if (
-                        len(original) >= 4
-                        and frequency >= 10000
-                        and (one_wrong_letter or swapped_letters)
-                    ):
-                        # Replace only the completed word,
-                        # preserving the rest of the sentence.
-                        interpreter.text = (
-                            current_text[:-(len(original) + 1)]
-                            + suggestion
-                            + " "
-                        )
-
-                        text_result = interpreter.get_result(
-                            text_result["accepted"]
-                        )
-
-                        correction_result["status"] = "applied"
 
     return {
         **prediction,
@@ -589,7 +533,8 @@ def analyze_video(video_path):
 @app.post("/predict-video")
 async def predict_video(
     video: UploadFile = File(...),
-    session_id: str = Form(...)
+    session_id: str = Form(...),
+    name_mode: bool = Form(False)
 ):
     """
     Receive a short webcam recording and
@@ -609,7 +554,7 @@ async def predict_video(
             video_path
         )
 
-        return build_text(session_id, result)
+        return build_text(session_id, result, name_mode=name_mode)
 
     except (ValueError, RuntimeError) as error:
         raise HTTPException(

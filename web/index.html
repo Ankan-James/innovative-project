@@ -349,6 +349,11 @@
                     disabled>
                     Stop Camera
                 </button>
+
+                <label style="display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" id="nameMode">
+                    Name Mode
+                </label>
             </div>
 
             <div class="status" id="status">
@@ -610,6 +615,10 @@
     async function predictVideo(blob) {
         const form = new FormData();
         form.append("session_id", recognitionSessionId);
+        form.append(
+            "name_mode",
+            document.getElementById("nameMode").checked ? "true" : "false"
+        );
 
         const format = blob.type.split(";")[0];
         const extension =
