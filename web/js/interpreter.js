@@ -124,13 +124,18 @@ class InterpreterUI {
     }
 
     // State 3: Successful recognition
-    if (this.letterEl) this.letterEl.textContent = result.label;
+    const displayChar = result.accepted_label || result.label;
+    if (this.letterEl) this.letterEl.textContent = displayChar;
     if (this.scoreEl) {
       const conf = typeof result.confidence === "number" ? result.confidence.toFixed(1) : result.confidence;
       this.scoreEl.textContent = `${conf}%`;
     }
     if (this.statusEl) {
-      this.statusEl.textContent = "Hand detected — Sign recognized successfully";
+      if (result.adaptive_corrected) {
+        this.statusEl.textContent = "Hand detected — Sign adaptively corrected";
+      } else {
+        this.statusEl.textContent = "Hand detected — Sign recognized successfully";
+      }
       this.statusEl.className = "recognition-status-text status-success";
     }
 

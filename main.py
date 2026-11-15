@@ -127,11 +127,18 @@ def build_text(session_id, prediction, name_mode=False):
                         text_result["accepted"]
                     )
 
-    return {
+    response = {
         **prediction,
         **text_result,
+        "raw_label": text_result.get("raw_label") or prediction.get("label"),
+        "accepted_label": text_result.get("accepted_label"),
+        "adaptive_corrected": text_result.get("adaptive_corrected", False),
         "autocorrect": correction_result
     }
+    if text_result.get("label") is not None:
+        response["label"] = text_result["label"]
+
+    return response
 
 
 torch.set_num_threads(min(4, os.cpu_count() or 2))
