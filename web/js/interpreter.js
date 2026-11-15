@@ -90,6 +90,10 @@ class InterpreterUI {
       this.formedTextEl.classList.add("empty");
     }
 
+    if (typeof this.onTextChange === "function") {
+      this.onTextChange(result.text || "");
+    }
+
     const framesAnalyzed = result.frames_analyzed || 8;
     const votes = typeof result.votes === "number" ? result.votes : 0;
 
@@ -189,6 +193,10 @@ class InterpreterUI {
     if (!this.formedTextEl) return;
     this.formedTextEl.textContent = "Your interpreted text will appear here...";
     this.formedTextEl.classList.add("empty");
+
+    if (typeof this.onTextChange === "function") {
+      this.onTextChange("");
+    }
   }
 }
 

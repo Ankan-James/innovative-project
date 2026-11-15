@@ -56,7 +56,25 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // =========================================================================
-  // 6. UI Event Bindings
+  // 6. Initialize Text-to-Speech (TTS)
+  // =========================================================================
+
+  const ttsSpeakBtn = document.getElementById("ttsSpeakBtn");
+  const ttsWaveform = document.getElementById("ttsWaveform");
+  const formedTextEl = document.getElementById("formedText");
+
+  const tts = new TextToSpeech({
+    speakBtn: ttsSpeakBtn,
+    waveformEl: ttsWaveform,
+    formedTextEl: formedTextEl
+  });
+
+  interpreterUI.onTextChange = () => {
+    tts.updateButtonState();
+  };
+
+  // =========================================================================
+  // 7. UI Event Bindings
   // =========================================================================
 
   if (startButton) {
@@ -76,6 +94,10 @@ document.addEventListener("DOMContentLoaded", () => {
   if (clearTextBtn) {
     clearTextBtn.addEventListener("click", () => {
       cameraController.resetSession();
+      if (tts) {
+        tts.stop();
+        tts.updateButtonState();
+      }
     });
   }
 

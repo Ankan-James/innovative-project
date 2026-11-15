@@ -199,13 +199,60 @@
               </div>
             </div>
 
-            <!-- Technical Specification Metadata -->
+            <!-- Technical Specification Metadata & Text-to-Speech Controller -->
             <div class="detector-specs">
-              <span class="specs-item">MediaPipe Hand Tracking</span>
-              <span class="specs-item">•</span>
-              <span class="specs-item">DeiT-Tiny ViT</span>
-              <span class="specs-item">•</span>
-              <span class="specs-item">Temporal Voting</span>
+              <div class="specs-group">
+                <span class="specs-item">MediaPipe Hand Tracking</span>
+                <span class="specs-separator">•</span>
+                <span class="specs-item">DeiT-Tiny ViT</span>
+                <span class="specs-separator">•</span>
+                <span class="specs-item">Temporal Voting</span>
+              </div>
+
+              <!-- Browser-Native Text-to-Speech & Waveform Indicator -->
+              <div class="tts-container" id="ttsContainer">
+                <button
+                  type="button"
+                  id="ttsSpeakBtn"
+                  class="tts-btn"
+                  aria-label="Speak formed text"
+                  title="No text to speak"
+                  disabled
+                >
+                  <!-- Speaker Icon (Default / Idle) -->
+                  <svg class="tts-icon tts-icon-speak" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                  </svg>
+                  <!-- Stop Icon (Speaking) -->
+                  <svg class="tts-icon tts-icon-stop" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <rect x="6" y="6" width="12" height="12" rx="1.5"></rect>
+                  </svg>
+                </button>
+
+                <div class="tts-divider" aria-hidden="true"></div>
+
+                <!-- Animated Waveform Playback Indicator (16 bars) -->
+                <div class="tts-waveform" id="ttsWaveform" aria-hidden="true">
+                  <span class="waveform-bar" style="--idle-scale: 0.22; --peak-scale: 0.85; --anim-duration: 0.65s; --anim-delay: 0.05s;"></span>
+                  <span class="waveform-bar" style="--idle-scale: 0.35; --peak-scale: 1.00; --anim-duration: 0.52s; --anim-delay: 0.18s;"></span>
+                  <span class="waveform-bar" style="--idle-scale: 0.25; --peak-scale: 0.70; --anim-duration: 0.78s; --anim-delay: 0.32s;"></span>
+                  <span class="waveform-bar" style="--idle-scale: 0.45; --peak-scale: 0.95; --anim-duration: 0.60s; --anim-delay: 0.12s;"></span>
+                  <span class="waveform-bar" style="--idle-scale: 0.30; --peak-scale: 0.80; --anim-duration: 0.72s; --anim-delay: 0.25s;"></span>
+                  <span class="waveform-bar" style="--idle-scale: 0.50; --peak-scale: 1.00; --anim-duration: 0.48s; --anim-delay: 0.08s;"></span>
+                  <span class="waveform-bar" style="--idle-scale: 0.40; --peak-scale: 0.90; --anim-duration: 0.68s; --anim-delay: 0.38s;"></span>
+                  <span class="waveform-bar" style="--idle-scale: 0.28; --peak-scale: 0.75; --anim-duration: 0.58s; --anim-delay: 0.22s;"></span>
+                  <span class="waveform-bar" style="--idle-scale: 0.42; --peak-scale: 0.92; --anim-duration: 0.62s; --anim-delay: 0.15s;"></span>
+                  <span class="waveform-bar" style="--idle-scale: 0.50; --peak-scale: 1.00; --anim-duration: 0.50s; --anim-delay: 0.28s;"></span>
+                  <span class="waveform-bar" style="--idle-scale: 0.32; --peak-scale: 0.82; --anim-duration: 0.74s; --anim-delay: 0.02s;"></span>
+                  <span class="waveform-bar" style="--idle-scale: 0.48; --peak-scale: 0.96; --anim-duration: 0.56s; --anim-delay: 0.35s;"></span>
+                  <span class="waveform-bar" style="--idle-scale: 0.26; --peak-scale: 0.72; --anim-duration: 0.80s; --anim-delay: 0.10s;"></span>
+                  <span class="waveform-bar" style="--idle-scale: 0.38; --peak-scale: 0.88; --anim-duration: 0.64s; --anim-delay: 0.20s;"></span>
+                  <span class="waveform-bar" style="--idle-scale: 0.30; --peak-scale: 0.78; --anim-duration: 0.70s; --anim-delay: 0.40s;"></span>
+                  <span class="waveform-bar" style="--idle-scale: 0.20; --peak-scale: 0.65; --anim-duration: 0.66s; --anim-delay: 0.14s;"></span>
+                </div>
+              </div>
             </div>
 
           </div>
@@ -235,6 +282,7 @@
   <script src="js/api.js"></script>
   <script src="js/interpreter.js"></script>
   <script src="js/camera.js"></script>
+  <script src="js/tts.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

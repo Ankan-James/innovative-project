@@ -412,14 +412,156 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   padding-top: 16px;
   border-top: 1px solid var(--border-color);
   font-size: 11px;
   color: var(--text-muted);
 }
 
+.specs-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .specs-item {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+}
+
+.specs-separator {
+  color: var(--border-color);
+  font-size: 10px;
+}
+
+/* ==========================================================================
+   Text-to-Speech (TTS) & Animated Waveform
+   ========================================================================== */
+
+.tts-container {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Speech Button: Compact Black Square with White Icon */
+.tts-btn {
+  width: 32px;
+  height: 32px;
+  background-color: var(--text-primary);
+  border: 1px solid var(--text-primary);
+  border-radius: var(--radius-sm);
+  color: #FFFFFF;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.16s ease, border-color 0.16s ease, opacity 0.16s ease, transform 0.1s ease;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.tts-btn:hover:not(:disabled) {
+  background-color: #262626;
+  border-color: #262626;
+}
+
+.tts-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.tts-btn:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+
+.tts-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Icons within button */
+.tts-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.tts-btn .tts-icon-stop {
+  display: none;
+}
+
+.tts-btn.is-speaking .tts-icon-speak {
+  display: none;
+}
+
+.tts-btn.is-speaking .tts-icon-stop {
+  display: block;
+}
+
+/* Thin Vertical Gray Divider */
+.tts-divider {
+  width: 1px;
+  height: 20px;
+  background-color: var(--border-color);
+  margin: 0 10px;
+  flex-shrink: 0;
+}
+
+/* Compact Waveform Container: ~100px wide, ~30px high */
+.tts-waveform {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3.5px;
+  width: 96px;
+  height: 30px;
+  padding: 0 2px;
+  background-color: transparent;
+  flex-shrink: 0;
+}
+
+/* Waveform Bars: Thin vertical bars with rounded ends */
+.waveform-bar {
+  width: 2.5px;
+  height: 24px;
+  background-color: #D4D4D0;
+  border-radius: 2px;
+  transform: scaleY(var(--idle-scale, 0.25));
+  transform-origin: center;
+  transition: transform 0.25s ease, background-color 0.25s ease;
+}
+
+/* Active Speaking State: Symmetrical Vertical Oscillation */
+.tts-waveform.is-speaking .waveform-bar {
+  background-color: var(--text-primary);
+  animation: waveformPulse var(--anim-duration, 0.65s) ease-in-out infinite alternate;
+  animation-delay: var(--anim-delay, 0s);
+}
+
+@keyframes waveformPulse {
+  0% {
+    transform: scaleY(var(--idle-scale, 0.2));
+  }
+  50% {
+    transform: scaleY(calc((var(--idle-scale, 0.2) + var(--peak-scale, 0.9)) * 0.55));
+  }
+  100% {
+    transform: scaleY(var(--peak-scale, 0.95));
+  }
+}
+
+/* Accessibility: Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .tts-waveform.is-speaking .waveform-bar {
+    animation: none;
+    transform: scaleY(0.7);
+    background-color: var(--text-primary);
+    opacity: 0.85;
+  }
 }
