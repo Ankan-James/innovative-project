@@ -1,6 +1,6 @@
 """
 SLMCI — Sign Language Interpreter
-Converts stable ASL predictions into text with an Adaptive Sign Correction System.
+Converts stable ASL predictions into text with an Adaptive Sign Correction System (All 26 Letters).
 """
 
 
@@ -8,18 +8,23 @@ class SignInterpreter:
     """
     Converts stable ASL predictions into text.
     Prevents the same held sign from being added repeatedly.
-    Includes an Adaptive Sign Correction System for K/V and A/T confusion pairs.
+    Includes an Adaptive Sign Correction System supporting all 26 alphabet letters:
+      - Bidirectional: K <-> V, A <-> T
+      - One-way: I -> J, X -> Z
     """
 
     LETTERS = set("ABCDEFGHIKLMNOPQRSTUVWXY")
 
-    # Strictly limited confusion pairs
-    CONFUSION_PAIRS = {
+    # Strictly limited correction mappings
+    CORRECTION_MAP = {
         "K": "V",
         "V": "K",
         "A": "T",
         "T": "A",
+        "I": "J",
+        "X": "Z",
     }
+    CONFUSION_PAIRS = CORRECTION_MAP
 
     # Correction State Machine constants
     STATE_NORMAL = "NORMAL"
@@ -38,6 +43,7 @@ class SignInterpreter:
         self.retry_index = None
         self.applied_letter = None
         self.applied_index = None
+        self.applied_pair = None
         self.suppressed_pair = None
         self.held_display_label = None
 
@@ -54,6 +60,7 @@ class SignInterpreter:
         self.retry_index = None
         self.applied_letter = None
         self.applied_index = None
+        self.applied_pair = None
         if not keep_suppression:
             self.suppressed_pair = None
 
@@ -154,32 +161,31 @@ class SignInterpreter:
                 # Second DEL: revert and reset correction to NORMAL.
                 # Crucial: do not immediately activate another correction for this pair.
                 # The next signing attempt must use raw AI prediction.
-                alt_pair = self.CONFUSION_PAIRS.get(deleted_char)
-                suppressed = frozenset([deleted_char, alt_pair]) if alt_pair else None
+                suppressed = self.applied_pair or frozenset([deleted_char])
                 self._reset_correction_state()
                 self.suppressed_pair = suppressed
 
-            # Scenario 2: User deletes an eligible confusion letter in NORMAL state
+            # Scenario 2: User deletes an eligible letter in NORMAL state
             elif (
                 self.correction_state == self.STATE_NORMAL
-                and deleted_char in self.CONFUSION_PAIRS
+                and deleted_char in self.CORRECTION_MAP
                 and (self.suppressed_pair is None or deleted_char not in self.suppressed_pair)
             ):
                 self.correction_state = self.STATE_WAITING_FOR_RETRY
                 self.rejected_letter = deleted_char
-                self.replacement_letter = self.CONFUSION_PAIRS[deleted_char]
+                self.replacement_letter = self.CORRECTION_MAP[deleted_char]
                 self.retry_index = len(self.text)
                 self.suppressed_pair = None
 
             # Scenario 3: Any other deletion
             else:
                 if (
-                    deleted_char in self.CONFUSION_PAIRS
+                    deleted_char in self.CORRECTION_MAP
                     and (self.suppressed_pair is None or deleted_char not in self.suppressed_pair)
                 ):
                     self.correction_state = self.STATE_WAITING_FOR_RETRY
                     self.rejected_letter = deleted_char
-                    self.replacement_letter = self.CONFUSION_PAIRS[deleted_char]
+                    self.replacement_letter = self.CORRECTION_MAP[deleted_char]
                     self.retry_index = len(self.text)
                     self.suppressed_pair = None
                 else:
@@ -200,7 +206,7 @@ class SignInterpreter:
 
             if self.correction_state == self.STATE_WAITING_FOR_RETRY:
                 if label == self.rejected_letter:
-                    # Model repeated the rejected confusion letter -> substitute paired alternative
+                    # Model repeated the rejected letter -> substitute alternative
                     accepted_label = self.replacement_letter
                     adaptive_corrected = True
                     self.text += accepted_label
@@ -208,13 +214,14 @@ class SignInterpreter:
                     self.correction_state = self.STATE_CORRECTION_APPLIED
                     self.applied_letter = accepted_label
                     self.applied_index = len(self.text) - 1
+                    self.applied_pair = frozenset([self.rejected_letter, self.replacement_letter])
                     self.rejected_letter = None
                     self.replacement_letter = None
                     self.retry_index = None
                     self.suppressed_pair = None
 
                 elif label == self.replacement_letter:
-                    # Model directly predicted the paired alternative -> keep it
+                    # Model directly predicted the alternative -> keep it
                     accepted_label = label
                     adaptive_corrected = False
                     self.text += accepted_label
@@ -222,6 +229,7 @@ class SignInterpreter:
                     self.correction_state = self.STATE_CORRECTION_APPLIED
                     self.applied_letter = accepted_label
                     self.applied_index = len(self.text) - 1
+                    self.applied_pair = frozenset([self.rejected_letter, self.replacement_letter])
                     self.rejected_letter = None
                     self.replacement_letter = None
                     self.retry_index = None
@@ -299,37 +307,8 @@ class SignInterpreter:
         self.last_sign = None
         self.no_hand_count = 0
         self.held_display_label = None
+        self.applied_pair = None
         self._reset_correction_state(keep_suppression=False)
         self.last_raw_label = None
         self.last_accepted_label = None
         self.last_adaptive_corrected = False
-
-
-# ----------------------------------
-# QUICK VERIFICATION RUNNER
-# ----------------------------------
-
-if __name__ == "__main__":
-    interpreter = SignInterpreter()
-
-    print("Testing Adaptive Sign Correction (V -> DEL -> V -> DEL -> V)...")
-    res1 = interpreter.update("V")
-    print("Sign V:", res1)
-    interpreter.update("NOTHING")
-
-    res2 = interpreter.update("DEL")
-    print("Sign DEL:", res2)
-    interpreter.update("NOTHING")
-
-    res3 = interpreter.update("V")
-    print("Sign V (retry):", res3)
-    interpreter.update("NOTHING")
-
-    res4 = interpreter.update("DEL")
-    print("Sign DEL (reset):", res4)
-    interpreter.update("NOTHING")
-
-    res5 = interpreter.update("V")
-    print("Sign V (normal):", res5)
-
-    print("\nFinal text:", interpreter.text)
