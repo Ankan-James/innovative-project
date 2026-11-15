@@ -1,0 +1,170 @@
+/* ==========================================================================
+   SLMCI — Hero Section Stylesheet
+   Clean, Balanced Editorial Layout with Centered 2x Area SVG Illustration
+   ========================================================================== */
+
+.hero-section {
+  position: relative;
+  width: 100%;
+  background-color: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   Hero Container
+   Spacious editorial composition with headroom for the enlarged 2x artwork
+   ========================================================================== */
+
+.hero-container {
+  position: relative;
+  width: 100%;
+  min-height: clamp(680px, 76vh, 800px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-top: 52px;
+  padding-bottom: 60px;
+}
+
+/* ==========================================================================
+   Centered Illustration (Scaled to 2.0x Area)
+   Linear scale factor: sqrt(2) ≈ 1.414x (width 85%, max-width: 1050px)
+   Centered within hero container with all hand elements fully visible.
+   ========================================================================== */
+
+.hero-artwork-wrapper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 85%;
+  max-width: 1050px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.hero-artwork {
+  width: 100%;
+  height: auto;
+  max-height: 740px;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  opacity: 0;
+  animation: heroArtworkFadeIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards 0.1s;
+}
+
+/* ==========================================================================
+   Upper-Left Text: Main Heading & Descriptor
+   ========================================================================== */
+
+.hero-content-primary {
+  position: relative;
+  z-index: 2;
+  max-width: min(460px, 42%);
+  align-self: flex-start;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: heroFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards 0.05s;
+}
+
+.hero-title {
+  font-size: clamp(32px, 3.6vw, 50px);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  color: var(--text-primary);
+  margin-bottom: 14px;
+}
+
+.hero-title-sub {
+  display: block;
+}
+
+.hero-descriptor {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ==========================================================================
+   Lower-Right Text: Secondary Messaging & CTA
+   ========================================================================== */
+
+.hero-content-secondary {
+  position: relative;
+  z-index: 2;
+  max-width: min(400px, 38%);
+  align-self: flex-end;
+  text-align: left;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: heroFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards 0.2s;
+}
+
+.hero-secondary-title {
+  font-size: clamp(21px, 2vw, 28px);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  line-height: 1.2;
+}
+
+.hero-description {
+  font-size: clamp(14px, 1.05vw, 15px);
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.hero-btn-arrow {
+  display: inline-block;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-primary:hover .hero-btn-arrow {
+  transform: translateX(4px);
+}
+
+/* ==========================================================================
+   Subtle Entrance Animations & Accessibility
+   ========================================================================== */
+
+@keyframes heroFadeIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes heroArtworkFadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-content-primary,
+  .hero-content-secondary,
+  .hero-artwork {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}

@@ -1,881 +1,240 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SLMCI — Sign Language Interpreter</title>
+  <meta name="description" content="AI-powered American Sign Language (ASL) fingerspelling interpreter converting hand gestures into readable text via Vision Transformers.">
 
-<title>SLMCI | Sign Language Interpreter</title>
+  <!-- Inter Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-<style>
-    :root {
-        --bg: #0b1120;
-        --panel: #151f31;
-        --border: #293549;
-        --text: #edf4ff;
-        --muted: #94a3b8;
-        --accent: #38bdf8;
-        --green: #4ade80;
-    }
-
-    * {
-        box-sizing: border-box;
-    }
-
-    body {
-        margin: 0;
-        min-height: 100vh;
-        font-family: Arial, sans-serif;
-        background: var(--bg);
-        color: var(--text);
-    }
-
-    header {
-        padding: 22px 5%;
-        border-bottom: 1px solid var(--border);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 16px;
-    }
-
-    .brand {
-        font-size: 25px;
-        font-weight: 800;
-        letter-spacing: 2px;
-    }
-
-    .brand span {
-        color: var(--accent);
-    }
-
-    .subtitle {
-        font-size: 13px;
-        color: var(--muted);
-        margin-top: 5px;
-    }
-
-    .tag {
-        padding: 9px 14px;
-        border-radius: 20px;
-        background: #203047;
-        color: var(--green);
-        font-size: 12px;
-    }
-
-    main {
-        max-width: 1450px;
-        margin: 34px auto;
-        padding: 0 25px;
-    }
-
-    .workspace {
-        display: grid;
-        grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-        gap: 24px;
-        align-items: start;
-    }
-
-    .panel {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 18px;
-        padding: 22px;
-        min-width: 0;
-    }
-
-    .panel-heading {
-        margin: 0 0 8px;
-        font-size: 21px;
-    }
-
-    .description {
-        color: var(--muted);
-        font-size: 13px;
-        margin: 0 0 20px;
-        line-height: 1.5;
-    }
-
-    .camera-frame {
-        position: relative;
-        width: 100%;
-        aspect-ratio: 4 / 3;
-        background: #030712;
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        overflow: hidden;
-    }
-
-    #camera,
-    #overlay {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-        transform: scaleX(-1);
-    }
-
-    #overlay {
-        pointer-events: none;
-    }
-
-    .camera-placeholder {
-        position: absolute;
-        inset: 0;
-        display: grid;
-        place-items: center;
-        color: var(--muted);
-        font-size: 15px;
-        pointer-events: none;
-    }
-
-    .controls {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        margin-top: 20px;
-    }
-
-    button {
-        border: 0;
-        border-radius: 9px;
-        padding: 13px 22px;
-        font-size: 14px;
-        font-weight: bold;
-        cursor: pointer;
-    }
-
-    button:disabled {
-        opacity: 0.45;
-        cursor: not-allowed;
-    }
-
-    .start {
-        background: var(--accent);
-        color: #07111f;
-    }
-
-    .stop {
-        background: #293549;
-        color: white;
-    }
-
-    .status {
-        margin-top: 18px;
-        padding: 13px;
-        background: #101a2b;
-        border-radius: 9px;
-        color: var(--muted);
-        font-size: 13px;
-        line-height: 1.5;
-    }
-
-    .result-card {
-        background: #101a2b;
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        padding: 24px 15px;
-        text-align: center;
-    }
-
-    .result-label {
-        font-size: 13px;
-        color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-
-    #prediction {
-        font-size: clamp(60px, 8vw, 100px);
-        font-weight: bold;
-        color: var(--accent);
-        margin: 12px 0;
-        overflow-wrap: anywhere;
-    }
-
-    .confidence {
-        font-size: 14px;
-        color: var(--muted);
-    }
-
-    .confidence-bar {
-        margin-top: 15px;
-        height: 8px;
-        background: #293549;
-        border-radius: 8px;
-        overflow: hidden;
-    }
-
-    #confidenceFill {
-        height: 100%;
-        width: 0%;
-        background: var(--green);
-        transition: width 0.2s;
-    }
-
-    .detector-state {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin: 20px 0;
-        font-size: 14px;
-    }
-
-    .indicator {
-        height: 10px;
-        width: 10px;
-        flex-shrink: 0;
-        border-radius: 50%;
-        background: #64748b;
-    }
-
-    .indicator.active {
-        background: var(--green);
-    }
-
-    .preview-section {
-        border-top: 1px solid var(--border);
-        padding-top: 17px;
-    }
-
-    .preview-title {
-        margin: 0 0 12px;
-        font-size: 15px;
-        font-weight: bold;
-    }
-
-    .crop-box {
-        height: 190px;
-        background: #080f1d;
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        overflow: hidden;
-    }
-
-    #cropPreview {
-        max-width: 100%;
-        max-height: 100%;
-        object-fit: contain;
-        display: none;
-    }
-
-    #cropPlaceholder {
-        color: var(--muted);
-        font-size: 13px;
-    }
-
-    .help {
-        font-size: 12px;
-        color: var(--muted);
-        line-height: 1.7;
-        margin-top: 14px;
-    }
-
-    @media (max-width: 850px) {
-        .workspace {
-            grid-template-columns: 1fr;
-        }
-
-        main {
-            padding: 0 15px;
-        }
-
-        header {
-            padding: 18px;
-        }
-
-        .panel {
-            padding: 16px;
-        }
-    }
-</style>
+  <!-- Modular Stylesheets -->
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/hero.css">
+  <link rel="stylesheet" href="css/interpreter.css">
+  <link rel="stylesheet" href="css/responsive.css">
 </head>
 
 <body>
 
-<header>
-    <div>
-        <div class="brand">SLM<span>CI</span></div>
-        <div class="subtitle">
-            Sign Language and Morse Code Interpreter
+  <!-- =========================================================================
+       Navigation Bar
+       ========================================================================= -->
+  <header class="site-nav">
+    <div class="container nav-container">
+      <a href="#home" class="nav-brand">
+        SLMCI<span class="brand-dot">.</span>
+      </a>
+
+      <nav>
+        <ul class="nav-links">
+          <li><a href="#home" class="nav-link active">Home</a></li>
+          <li><a href="#interpreter" class="nav-link">Interpreter</a></li>
+          <li><a href="https://github.com" target="_blank" rel="noopener noreferrer" class="nav-link">GitHub</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       Hero Section — Balanced Editorial Layout with Reaching Hands Illustration
+       ========================================================================= -->
+  <section class="hero-section" id="home">
+    <div class="container hero-container">
+
+      <!-- Upper-Left Text: Main Heading & Descriptor -->
+      <div class="hero-content hero-content-primary">
+        <h1 class="hero-title">
+          Breaking Barriers.<br>
+          <span class="hero-title-sub">One Sign at a Time.</span>
+        </h1>
+        <p class="hero-descriptor">AI-POWERED SIGN LANGUAGE INTERPRETER</p>
+      </div>
+
+      <!-- Centered Moderate-Sized Illustration -->
+      <div class="hero-artwork-wrapper">
+        <img
+          class="hero-artwork"
+          src="assets/images/hero-hands.svg"
+          alt="Illustration of two hands reaching toward each other"
+          loading="eager"
+          decoding="async"
+        >
+      </div>
+
+      <!-- Lower-Right Text: Secondary Messaging & CTA -->
+      <div class="hero-content hero-content-secondary">
+        <h2 class="hero-secondary-title">Signs into words.</h2>
+        <p class="hero-description">
+          Transforming hand gestures into readable text through computer vision and artificial intelligence.
+        </p>
+        <div class="hero-actions">
+          <a href="#interpreter" class="btn btn-primary">
+            <span>Explore Interpreter</span>
+            <span class="hero-btn-arrow">&rarr;</span>
+          </a>
         </div>
-    </div>
-    <div class="tag">81K ViT • Local AI</div>
-</header>
-
-<main>
-    <div class="workspace">
-
-        <!-- LEFT: WEBCAM -->
-        <section class="panel">
-            <h2 class="panel-heading">Live Camera</h2>
-            <p class="description">
-                Show an ASL hand sign inside the camera frame.
-            </p>
-
-            <div class="camera-frame">
-                <video
-                    id="camera"
-                    autoplay
-                    playsinline
-                    muted>
-                </video>
-
-                <canvas id="overlay"></canvas>
-
-                <div
-                    id="cameraPlaceholder"
-                    class="camera-placeholder">
-                    Camera is off
-                </div>
-            </div>
-
-            <div class="controls">
-                <button
-                    id="startButton"
-                    class="start"
-                    onclick="startCamera()">
-                    Start Camera
-                </button>
-
-                <button
-                    id="stopButton"
-                    class="stop"
-                    onclick="stopCamera()"
-                    disabled>
-                    Stop Camera
-                </button>
-
-                <label style="display:flex; align-items:center; gap:8px;">
-                    <input type="checkbox" id="nameMode">
-                    Name Mode
-                </label>
-            </div>
-
-            <div class="status" id="status">
-                Ready to start.
-            </div>
-        </section>
-
-        <!-- RIGHT: DETECTOR -->
-        <section class="panel">
-            <h2 class="panel-heading">AI Sign Detector</h2>
-            <p class="description">
-                Sign recognition using our trained DeiT-Tiny model.
-            </p>
-
-            <div class="result-card">
-                <div class="result-label">
-                    Recognized Sign
-                </div>
-
-                <div id="prediction">—</div>
-                <div style="margin: 15px 0;">
-                    <div class="result-label">Formed Text</div>
-
-                    <div
-                        id="formedText"
-                        style="font-size: 28px; font-weight: bold;
-                            overflow-wrap: anywhere; margin-top: 8px;">
-                        —
-                    </div>
-                </div>
-
-                <div
-                    class="confidence"
-                    id="confidence">
-                    Model score: —
-                </div>
-
-                <div class="confidence-bar">
-                    <div id="confidenceFill"></div>
-                </div>
-            </div>
-
-            <div class="detector-state">
-                <span
-                    class="indicator"
-                    id="indicator">
-                </span>
-                <span id="handStatus">
-                    Waiting for hand detection
-                </span>
-            </div>
-
-            <div class="preview-section">
-                <div class="preview-title">
-                    8-Frame Voting Results
-                </div>
-
-                <div class="crop-box">
-                    <div style="text-align: center;">
-                        <div id="voteCount"
-                            style="font-size: 42px; font-weight: bold; color: #38bdf8;">
-                            0 / 8
-                        </div>
-
-                        <p style="color: #94a3b8; font-size: 13px;">
-                            Frames agreeing on the final sign
-                        </p>
-                    </div>
-                </div>
-
-                <p class="help">
-                    SLMCI records a short clip and analyzes
-                    8 evenly spaced frames. At least 5
-                    matching predictions are required.
-                </p>
-            </div>
-        </section>
+      </div>
 
     </div>
-</main>
-
-<canvas id="captureCanvas" hidden></canvas>
-
-
-<script>
-    const video = document.getElementById("camera");
-
-    const overlay = document.getElementById("overlay");
-    const overlayCtx = overlay.getContext("2d");
-
-    const startButton = document.getElementById("startButton");
-    const stopButton = document.getElementById("stopButton");
-
-    const formedText = document.getElementById("formedText");
-    let recognitionSessionId = null;
-
-    const cameraPlaceholder =
-        document.getElementById("cameraPlaceholder");
-
-    const prediction = document.getElementById("prediction");
-    const confidence = document.getElementById("confidence");
-    const confidenceFill =
-        document.getElementById("confidenceFill");
-
-    const handStatus = document.getElementById("handStatus");
-    const indicator = document.getElementById("indicator");
-    const status = document.getElementById("status");
-    const voteCount = document.getElementById("voteCount");
-
-    // Each clip lasts 2 seconds.
-    const CLIP_DURATION = 1500;
-
-    let stream = null;
-    let recorder = null;
-    let recordingTimer = null;
-    let requestController = null;
-
-    let running = false;
-    let selectedMimeType = null;
-    let sessionId = 0;
-
-
-    // =========================================
-    // CAMERA
-    // =========================================
-
-    async function startCamera() {
-        if (running || startButton.disabled) return;
-
-        startButton.disabled = true;
-
-        try {
-            if (!navigator.mediaDevices?.getUserMedia) {
-                throw new Error("Webcam access is unavailable.");
-            }
-
-            if (!window.MediaRecorder) {
-                throw new Error(
-                    "This browser does not support video recording."
-                );
-            }
-
-            const supportedTypes = [
-                "video/webm;codecs=vp8",
-                "video/webm",
-                "video/mp4"
-            ];
-
-            selectedMimeType = supportedTypes.find(
-                type => MediaRecorder.isTypeSupported(type)
-            );
-
-            if (!selectedMimeType) {
-                throw new Error(
-                    "No supported video recording format was found."
-                );
-            }
-
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    width: { ideal: 640 },
-                    height: { ideal: 480 },
-                    facingMode: "user"
-                },
-                audio: false
-            });
-
-            video.srcObject = stream;
-            await video.play();
-
-            recognitionSessionId = crypto.randomUUID();
-            formedText.textContent = "—";
-
-            running = true;
-            const currentSession = ++sessionId;
-
-            stopButton.disabled = false;
-            cameraPlaceholder.style.display = "none";
-
-            status.textContent =
-                "Camera active. Starting 8-frame recognition...";
-
-            // Begin continuous clip-based recognition.
-            analyzeLoop(currentSession);
-
-        } catch (error) {
-            stopCamera();
-            status.textContent =
-                "Camera error: " + error.message;
-        }
-    }
-
-
-    // =========================================
-    // RECORD ONE VIDEO CLIP
-    // =========================================
-
-    function recordClip(currentSession) {
-        return new Promise((resolve, reject) => {
-            if (!running || currentSession !== sessionId) {
-                resolve(null);
-                return;
-            }
-
-            const chunks = [];
-
-            try {
-                recorder = new MediaRecorder(stream, {
-                    mimeType: selectedMimeType,
-                    videoBitsPerSecond: 800000
-                });
-
-                const currentRecorder = recorder;
-
-                currentRecorder.ondataavailable = event => {
-                    if (event.data.size > 0) {
-                        chunks.push(event.data);
-                    }
-                };
-
-                currentRecorder.onerror = () => {
-                    clearTimeout(recordingTimer);
-                    reject(new Error("Video recording failed."));
-                };
-
-                currentRecorder.onstop = () => {
-                    clearTimeout(recordingTimer);
-
-                    if (recorder === currentRecorder) {
-                        recorder = null;
-                    }
-
-                    const blob = new Blob(chunks, {
-                        type: currentRecorder.mimeType
-                    });
-
-                    resolve(blob);
-                };
-
-                currentRecorder.start();
-
-                recordingTimer = setTimeout(() => {
-                    if (currentRecorder.state === "recording") {
-                        currentRecorder.stop();
-                    }
-                }, CLIP_DURATION);
-
-            } catch (error) {
-                reject(error);
-            }
-        });
-    }
-
-
-    // =========================================
-    // SEND VIDEO TO FASTAPI
-    // =========================================
-
-    async function predictVideo(blob) {
-        const form = new FormData();
-        form.append("session_id", recognitionSessionId);
-        form.append(
-            "name_mode",
-            document.getElementById("nameMode").checked ? "true" : "false"
-        );
-
-        const format = blob.type.split(";")[0];
-        const extension =
-            format === "video/mp4" ? "mp4" : "webm";
-
-        form.append(
-            "video",
-            blob,
-            `slmci_recording.${extension}`
-        );
-
-        const controller = new AbortController();
-        requestController = controller;
-
-        try {
-            const response = await fetch("/predict-video", {
-                method: "POST",
-                body: form,
-                signal: controller.signal
-            });
-
-            if (!response.ok) {
-                const errorData =
-                    await response.json().catch(() => ({}));
-
-                throw new Error(
-                    errorData.detail ||
-                    `HTTP error ${response.status}`
-                );
-            }
-
-            return await response.json();
-
-        } finally {
-            if (requestController === controller) {
-                requestController = null;
-            }
-        }
-    }
-
-
-    // =========================================
-    // DISPLAY AI RESULTS
-    // =========================================
-
-
-    // =========================================
-    // GREEN HAND DETECTION BOX
-    // =========================================
-
-    function drawHandBox(result) {
-        const videoWidth = video.videoWidth;
-        const videoHeight = video.videoHeight;
-
-        if (!videoWidth || !videoHeight) {
-            return;
-        }
-
-        // Match the canvas to the webcam resolution.
-        if (
-            overlay.width !== videoWidth ||
-            overlay.height !== videoHeight
-        ) {
-            overlay.width = videoWidth;
-            overlay.height = videoHeight;
-        }
-
-        // Remove the previous detection box.
-        overlayCtx.clearRect(
-            0,
-            0,
-            overlay.width,
-            overlay.height
-        );
-
-        if (
-            !result.bbox ||
-            !result.frame_width ||
-            !result.frame_height
-        ) {
-            return;
-        }
-
-        const [x1, y1, x2, y2] = result.bbox;
-
-        // Convert backend coordinates to canvas coordinates.
-        const scaleX = overlay.width / result.frame_width;
-        const scaleY = overlay.height / result.frame_height;
-
-        overlayCtx.strokeStyle = "#4ade80";
-        overlayCtx.lineWidth = 4;
-
-        overlayCtx.strokeRect(
-            x1 * scaleX,
-            y1 * scaleY,
-            (x2 - x1) * scaleX,
-            (y2 - y1) * scaleY
-        );
-    }
-
-
-    function displayResult(result) {
-        
-        // Update the green hand-detection box
-        drawHandBox(result);
-
-        // Display formed text, including applied corrections
-        formedText.textContent = result.text || "—";
-
-        const frames = result.frames_analyzed || 8;
-        const votes = result.votes || 0;
-
-        voteCount.textContent = `${votes} / ${frames}`;
-
-        if (!result.hand_detected) {
-            prediction.textContent = "—";
-            confidence.textContent = "Model score: —";
-            confidenceFill.style.width = "0%";
-
-            handStatus.textContent = "No hand detected";
-            indicator.classList.remove("active");
-
-            status.textContent =
-                "No hand found. Show your hand clearly.";
-
-            return;
-        }
-
-        indicator.classList.add("active");
-
-        if (!result.label) {
-            prediction.textContent = "—";
-            confidence.textContent = "No stable prediction";
-            confidenceFill.style.width = "0%";
-
-            handStatus.textContent =
-                "Hand detected, but predictions disagree";
-
-            status.textContent =
-                "Need at least 5 matching frame predictions.";
-
-            return;
-        }
-
-        // Accepted sign
-        prediction.textContent = result.label;
-
-        confidence.textContent =
-            `Average model score: ${result.confidence}%`;
-
-        confidenceFill.style.width =
-            `${Math.min(100, result.confidence)}%`;
-
-        handStatus.textContent =
-            `Stable sign detected: ${result.label}`;
-
-        status.textContent =
-            `Prediction complete. ${votes} of ${frames} frames agree.`;
-    }
-
-
-    // =========================================
-    // CONTINUOUS RECOGNITION LOOP
-    // =========================================
-
-    async function analyzeLoop(currentSession) {
-        while (running && currentSession === sessionId) {
-            try {
-                status.textContent =
-                    "Recording a 1.5-second video clip...";
-
-                const clip = await recordClip(currentSession);
-
-                if (!running || currentSession !== sessionId) {
-                    break;
-                }
-
-                if (!clip || clip.size === 0) {
-                    throw new Error("Recorded video is empty.");
-                }
-
-                status.textContent =
-                    "Analyzing 8 frames with MediaPipe and ViT...";
-
-                const result = await predictVideo(clip);
-
-                if (!running || currentSession !== sessionId) {
-                    break;
-                }
-
-                displayResult(result);
-
-                // Short pause before recording the next clip.
-                await new Promise(resolve =>
-                    setTimeout(resolve, 300)
-                );
-
-            } catch (error) {
-                if (error.name === "AbortError") {
-                    break;
-                }
-
-                stopCamera();
-
-                status.textContent =
-                    "Video recognition error: " + error.message;
-
-                break;
-            }
-        }
-    }
-
-
-    // =========================================
-    // STOP CAMERA
-    // =========================================
-
-    function stopCamera() {
-        running = false;
-        sessionId++;
-
-        clearTimeout(recordingTimer);
-
-        if (requestController) {
-            requestController.abort();
-            requestController = null;
-        }
-
-        if (recorder && recorder.state !== "inactive") {
-            recorder.stop();
-        }
-
-        if (stream) {
-            stream.getTracks().forEach(
-                track => track.stop()
-            );
-        }
-
-        stream = null;
-        video.srcObject = null;
-
-        overlayCtx.clearRect(
-            0,
-            0,
-            overlay.width,
-            overlay.height
-        );
-
-        startButton.disabled = false;
-        stopButton.disabled = true;
-        cameraPlaceholder.style.display = "grid";
-
-        indicator.classList.remove("active");
-
-        status.textContent = "Camera stopped.";
-    }
-</script>
-
+  </section>
+
+  <!-- =========================================================================
+       Sign Language Interpreter Section
+       ========================================================================= -->
+  <section class="interpreter-section" id="interpreter">
+    <div class="container">
+
+      <div class="interpreter-header">
+        <span class="section-label">Real-Time Computer Vision</span>
+        <h2 class="interpreter-header-title">Sign Language Interpreter</h2>
+      </div>
+
+      <div class="interpreter-grid">
+
+        <!-- ===================================================================
+             Left Column: Live Camera
+             =================================================================== -->
+        <section class="panel camera-panel">
+          <div class="panel-header">
+            <h3 class="panel-title">Live Camera</h3>
+            <span class="section-label">4:3 Aspect Ratio</span>
+          </div>
+
+          <div class="camera-preview-container">
+            <video id="camera" autoplay playsinline muted></video>
+            <canvas id="overlay"></canvas>
+
+            <div id="cameraPlaceholder" class="camera-placeholder">
+              <svg class="camera-placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+              </svg>
+              <span>Camera is inactive</span>
+            </div>
+          </div>
+
+          <div class="camera-controls">
+            <button id="startButton" class="btn btn-primary" type="button">
+              Start Camera
+            </button>
+
+            <button id="stopButton" class="btn btn-secondary" type="button" disabled>
+              Stop Camera
+            </button>
+
+            <label class="name-mode-wrapper" for="nameMode" title="Disable autocorrect for proper names">
+              <span class="toggle-label">Name Mode</span>
+              <div class="toggle-switch">
+                <input type="checkbox" id="nameMode">
+                <span class="toggle-slider"></span>
+              </div>
+            </label>
+          </div>
+
+          <div id="cameraStatus" class="camera-status-text">
+            Ready to start.
+          </div>
+        </section>
+
+        <!-- ===================================================================
+             Right Column: AI Detector (Compact Layout)
+             =================================================================== -->
+        <section class="panel detector-panel">
+          <div class="panel-header">
+            <h3 class="panel-title">AI Detector</h3>
+            <span class="section-label">8-Frame Inference</span>
+          </div>
+
+          <div class="detector-container">
+
+            <!-- Recognized Sign Block -->
+            <div class="recognized-sign-block">
+              <span class="recognized-sign-label">RECOGNIZED SIGN</span>
+
+              <!-- Critical Requirement: Single Horizontal Row on Desktop -->
+              <div class="recognition-row">
+                <!-- 1. Recognized Letter (Far Left) -->
+                <div id="recognizedSign" class="recognized-letter">—</div>
+
+                <!-- 2. Model Score Immediately Beside Letter -->
+                <div class="model-score-group">
+                  <span>Model score —</span>
+                  <span id="modelScore" class="model-score-value">—</span>
+                </div>
+
+                <!-- 3. Thin Vertical Separator -->
+                <div class="row-divider"></div>
+
+                <!-- 4. Dynamic Hand Detection & Recognition Status -->
+                <div id="dynamicStatus" class="recognition-status-text">
+                  Camera inactive
+                </div>
+
+                <!-- 5. 4x2 Temporal Voting Grid (Far Right) -->
+                <div class="voting-grid-wrapper" title="4 rows × 2 columns = 8 frames aggregate voting">
+                  <div id="votingGrid" class="voting-grid"></div>
+                  <span id="voteFraction" class="vote-count-indicator">0/8</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Formed Text Area -->
+            <div class="formed-text-block">
+              <div class="formed-text-header">
+                <div class="formed-text-meta">
+                  <span class="formed-text-label">FORMED TEXT</span>
+                  <span id="autocorrectBadge" class="autocorrect-badge">Autocorrect enabled</span>
+                </div>
+                <button type="button" id="clearTextBtn" class="clear-text-btn" title="Clear accumulated text">Clear</button>
+              </div>
+
+              <div class="formed-text-box">
+                <div id="formedText" class="formed-text-display empty">
+                  Your interpreted text will appear here...
+                </div>
+              </div>
+            </div>
+
+            <!-- Technical Specification Metadata -->
+            <div class="detector-specs">
+              <span class="specs-item">MediaPipe Hand Tracking</span>
+              <span class="specs-item">•</span>
+              <span class="specs-item">DeiT-Tiny ViT</span>
+              <span class="specs-item">•</span>
+              <span class="specs-item">Temporal Voting</span>
+            </div>
+
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================================
+       Minimal Footer
+       ========================================================================= -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>
+        <span class="footer-brand">SLMCI.</span>
+        <span>AI-powered American Sign Language interpreter.</span>
+      </div>
+      <div class="footer-meta">
+        FastAPI • PyTorch • MediaPipe • Local ViT
+      </div>
+    </div>
+  </footer>
+
+  <!-- Modular Scripts -->
+  <script src="js/overlay.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/interpreter.js"></script>
+  <script src="js/camera.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>

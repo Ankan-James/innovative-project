@@ -1,0 +1,243 @@
+/* ==========================================================================
+   SLMCI — Responsive Design Stylesheet
+   Desktop, Tablet, and Mobile Adaptive Layouts
+   ========================================================================== */
+
+/* Tablet Breakpoint (<= 1024px) */
+@media screen and (max-width: 1024px) {
+  .container {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  /* Hero Section Tablet Adaptations */
+  .hero-container {
+    min-height: clamp(600px, 70vh, 720px);
+    padding-top: 40px;
+    padding-bottom: 48px;
+  }
+
+  .hero-content-primary {
+    max-width: 44%;
+  }
+
+  .hero-title {
+    font-size: clamp(28px, 3.2vw, 36px);
+  }
+
+  .hero-content-secondary {
+    max-width: 42%;
+  }
+
+  .hero-secondary-title {
+    font-size: clamp(19px, 1.8vw, 22px);
+  }
+
+  .hero-artwork-wrapper {
+    width: 78%;
+    max-width: 760px;
+  }
+
+  .hero-artwork {
+    max-height: 580px;
+  }
+
+  /* Interpreter Grid Tablet */
+  .interpreter-grid {
+    gap: 24px;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .panel {
+    padding: 22px;
+  }
+
+  .recognition-row {
+    padding: 14px 16px;
+    gap: 12px;
+  }
+
+  .recognized-letter {
+    font-size: 32px;
+    min-width: 38px;
+  }
+}
+
+/* Intermediate & Vertical Mobile Transition (<= 860px) */
+@media screen and (max-width: 860px) {
+  /* Clean Vertical Stack on Mobile:
+     1. Main heading & descriptor
+     2. Reaching-hands SVG illustration
+     3. Secondary heading & description
+     4. Explore Interpreter button */
+  .hero-container {
+    min-height: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 28px;
+    padding-top: 48px;
+    padding-bottom: 56px;
+  }
+
+  .hero-content-primary {
+    order: 1;
+    width: 100%;
+    max-width: 520px;
+    align-self: center;
+    text-align: center;
+  }
+
+  .hero-artwork-wrapper {
+    order: 2;
+    position: static;
+    transform: none;
+    width: 100%;
+    max-width: 580px;
+    margin: 0 auto;
+    padding: 0 16px;
+  }
+
+  .hero-artwork {
+    width: 100%;
+    max-width: 560px;
+    height: auto;
+    max-height: 440px;
+  }
+
+  .hero-content-secondary {
+    order: 3;
+    width: 100%;
+    max-width: 460px;
+    align-self: center;
+    text-align: center;
+  }
+
+  .hero-actions {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .interpreter-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+}
+
+/* Mobile Breakpoint (<= 640px) */
+@media screen and (max-width: 640px) {
+  :root {
+    --header-height: 58px;
+  }
+
+  .container {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .site-nav .nav-links {
+    gap: 20px;
+  }
+
+  .hero-container {
+    gap: 24px;
+    padding-top: 36px;
+    padding-bottom: 48px;
+  }
+
+  .hero-title {
+    font-size: clamp(28px, 7.5vw, 34px);
+    margin-bottom: 12px;
+  }
+
+  .hero-descriptor {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+  }
+
+  .hero-artwork-wrapper {
+    max-width: 440px;
+    padding: 0 8px;
+  }
+
+  .hero-artwork {
+    max-width: 420px;
+    max-height: 330px;
+  }
+
+  .hero-secondary-title {
+    font-size: 20px;
+    margin-bottom: 10px;
+  }
+
+  .hero-description {
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+
+  .hero-actions .btn {
+    width: 100%;
+  }
+
+  .interpreter-section {
+    padding: 50px 0 64px;
+  }
+
+  .panel {
+    padding: 18px;
+  }
+
+  .camera-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .camera-controls .btn {
+    width: 100%;
+  }
+
+  .name-mode-wrapper {
+    margin-left: 0;
+    justify-content: space-between;
+    padding: 6px 0;
+  }
+
+  /* Wrap recognition metadata on narrow mobile while preserving alignment */
+  .recognition-row {
+    flex-wrap: wrap;
+    min-height: auto;
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .row-divider {
+    display: none;
+  }
+
+  .recognition-status-text {
+    width: 100%;
+    order: 3;
+    font-size: 12px;
+  }
+
+  .voting-grid-wrapper {
+    margin-left: auto;
+    order: 2;
+  }
+
+  .formed-text-box {
+    padding: 16px;
+    min-height: 90px;
+  }
+
+  .formed-text-display {
+    font-size: 20px;
+  }
+
+  .footer-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

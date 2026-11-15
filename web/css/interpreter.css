@@ -1,0 +1,425 @@
+/* ==========================================================================
+   SLMCI — Sign Language Interpreter Stylesheet
+   Compact, Two-Column Architecture & Single-Row Recognition Hierarchy
+   ========================================================================== */
+
+.interpreter-section {
+  padding: 80px 0 100px;
+  background-color: var(--bg-primary);
+}
+
+.interpreter-header {
+  margin-bottom: 36px;
+}
+
+.interpreter-header-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+  margin-top: 6px;
+}
+
+/* Two-column layout: Camera 48% | Detector 52% */
+.interpreter-grid {
+  display: grid;
+  grid-template-columns: 48% 52%;
+  gap: 32px;
+  align-items: start;
+}
+
+/* Base Panel Styling */
+.panel {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 28px;
+  min-width: 0;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.panel-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+}
+
+/* ==========================================================================
+   Live Camera Section
+   ========================================================================== */
+
+.camera-preview-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background-color: #0F0F0F;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+#camera,
+#overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scaleX(-1);
+}
+
+#overlay {
+  pointer-events: none;
+}
+
+.camera-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background-color: var(--bg-secondary);
+  color: var(--text-muted);
+  font-size: 13px;
+  user-select: none;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.camera-placeholder-icon {
+  width: 32px;
+  height: 32px;
+  stroke: var(--text-muted);
+}
+
+/* Controls Bar */
+.camera-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+/* Name Mode Toggle */
+.name-mode-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: var(--color-neutral-cell);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toggle-slider::before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  bottom: 2px;
+  background-color: var(--bg-primary);
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(16px);
+}
+
+.toggle-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.camera-status-text {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  min-height: 20px;
+}
+
+/* ==========================================================================
+   AI Detector — Compact Layout
+   ========================================================================== */
+
+.detector-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Exact Visual Hierarchy: Top Label */
+.recognized-sign-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recognized-sign-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+/* CRITICAL: Single Horizontal Row on Desktop */
+.recognition-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  min-height: 72px;
+}
+
+/* Letter at Far Left */
+.recognized-letter {
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  min-width: 44px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* Model Score Immediately Beside Letter */
+.model-score-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.model-score-value {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+/* Thin Vertical Separator */
+.row-divider {
+  width: 1px;
+  height: 20px;
+  background-color: var(--border-color);
+  flex-shrink: 0;
+}
+
+/* Hand Detection Status & Recognition Message */
+.recognition-status-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  flex: 1;
+  min-width: 0;
+}
+
+.recognition-status-text.status-success {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.recognition-status-text.status-unstable {
+  color: var(--text-primary);
+}
+
+/* Voting Grid at Far Right */
+.voting-grid-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* 4 rows × 2 columns = 8 squares */
+.voting-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 10px);
+  grid-template-rows: repeat(4, 10px);
+  gap: 3px;
+}
+
+.vote-cell {
+  width: 10px;
+  height: 10px;
+  aspect-ratio: 1 / 1;
+  border-radius: 1px;
+  background-color: var(--color-neutral-cell);
+  transition: background-color 0.2s ease;
+}
+
+.vote-cell.matching {
+  background-color: var(--color-success);
+}
+
+.vote-cell.nonmatching {
+  background-color: var(--color-error);
+}
+
+.vote-cell.neutral {
+  background-color: var(--color-neutral-cell);
+}
+
+.vote-count-indicator {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Formed Text Area
+   ========================================================================== */
+
+.formed-text-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.formed-text-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.formed-text-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.formed-text-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.autocorrect-badge {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.autocorrect-badge.badge-name-mode {
+  background-color: #EFF6FF;
+  border-color: #BFDBFE;
+  color: var(--color-accent);
+}
+
+.clear-text-btn {
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  transition: color 0.15s ease;
+}
+
+.clear-text-btn:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+/* Text Container */
+.formed-text-box {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 20px 22px;
+  min-height: 110px;
+  max-height: 140px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.formed-text-display {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.formed-text-display.empty {
+  font-size: 14px;
+  font-weight: 400;
+  font-style: normal;
+  color: var(--text-muted);
+}
+
+/* Technical Specification Bar */
+.detector-specs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.specs-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

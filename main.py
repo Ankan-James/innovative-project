@@ -15,6 +15,7 @@ from torchvision import transforms
 from transformers import AutoModelForImageClassification
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from starlette.concurrency import run_in_threadpool
 
@@ -565,3 +566,15 @@ async def predict_video(
     finally:
         if video_path is not None:
             delete_temporary_video(video_path)
+
+
+# ========================================
+# STATIC FILES SERVING
+# ========================================
+
+app.mount("/css", StaticFiles(directory=ROOT / "web" / "css"), name="css")
+app.mount("/js", StaticFiles(directory=ROOT / "web" / "js"), name="js")
+app.mount("/components", StaticFiles(directory=ROOT / "web" / "components"), name="components")
+app.mount("/assets", StaticFiles(directory=ROOT / "web" / "assets"), name="assets")
+app.mount("/static", StaticFiles(directory=ROOT / "web"), name="static")
+
