@@ -16,6 +16,20 @@ from transformers import AutoModelForImageClassification
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import FileResponse
 
+from starlette.concurrency import run_in_threadpool
+
+from uuid import UUID
+from fastapi import Form
+from src.inference.sign_interpreter import SignInterpreter
+
+from src.camera.video_recorder import (
+    receive_video,
+    delete_temporary_video
+)
+from src.camera.frame_sampler import sample_video
+from src.inference.temporal_voting import TemporalVoting
+
+from src.inference.autocorrect import AutoCorrect
 
 # ========================================
 # CONFIGURATION
@@ -31,6 +45,149 @@ CLASS_NAMES = list("ABCDEFGHIKLMNOPQRSTUVWXY") + [
 ]
 
 app = FastAPI(title="SLMCI Sign Language API")
+
+
+# ========================================
+# WORD BUILDING - PER CAMERA SESSION
+# ========================================
+
+word_sessions = {}
+session_last_seen = {}
+word_lock = threading.Lock()
+autocorrect = AutoCorrect()
+
+SESSION_TIMEOUT = 1800  # 30 minutes
+
+
+
+def build_text(session_id, prediction):
+    """
+    Build text from recognized signs.
+    Check spelling when a word is completed.
+    """
+
+    try:
+        session_id = str(UUID(session_id))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid session ID"
+        )
+
+    with word_lock:
+        now = time.monotonic()
+
+        # Remove expired sessions
+        for sid, last_seen in list(session_last_seen.items()):
+            if now - last_seen > SESSION_TIMEOUT:
+                word_sessions.pop(sid, None)
+                session_last_seen.pop(sid, None)
+
+        if session_id not in word_sessions:
+            word_sessions[session_id] = SignInterpreter()
+
+        session_last_seen[session_id] = now
+
+        interpreter = word_sessions[session_id]
+
+        previous_text = interpreter.text
+
+        # Add the real AI prediction to the text
+        text_result = interpreter.update(
+            prediction["label"],
+            hand_detected=prediction["hand_detected"]
+        )
+
+        current_text = text_result["text"]
+        correction_result = None
+
+        # A newly accepted SPACE means a word
+        # has just been completed.
+        word_completed = (
+            text_result["accepted"]
+            and current_text.endswith(" ")
+            and not previous_text.endswith(" ")
+            and current_text != previous_text
+        )
+
+        if word_completed:
+            words = current_text.strip().split()
+
+            if words:
+                completed_word = words[-1]
+
+                correction_result = (
+                    autocorrect.check_word(
+                        completed_word
+                    )
+                )
+                
+                
+                # Automatically apply simple spelling corrections
+                if (
+                    correction_result["status"] == "review"
+                    and correction_result["suggestion"]
+                ):
+                    original = completed_word
+                    suggestion = correction_result["suggestion"]
+
+                    # Check whether the correction is a simple typo
+                    original_upper = original.upper()
+                    suggestion_upper = suggestion.upper()
+
+                    same_length = len(original_upper) == len(suggestion_upper)
+
+                    # Example: RELLO -> HELLO
+                    one_wrong_letter = (
+                        same_length
+                        and sum(
+                            a != b
+                            for a, b in zip(original_upper, suggestion_upper)
+                        ) == 1
+                    )
+
+                    # Example: WROLD -> WORLD
+                    swapped_letters = (
+                        same_length
+                        and any(
+                            original_upper[:i]
+                            + original_upper[i + 1]
+                            + original_upper[i]
+                            + original_upper[i + 2:]
+                            == suggestion_upper
+                            for i in range(len(original_upper) - 1)
+                        )
+                    )
+
+                    frequency = autocorrect.spell.word_frequency[
+                        suggestion.lower()
+                    ]
+
+                    if (
+                        len(original) >= 4
+                        and frequency >= 10000
+                        and (one_wrong_letter or swapped_letters)
+                    ):
+                        # Replace only the completed word,
+                        # preserving the rest of the sentence.
+                        interpreter.text = (
+                            current_text[:-(len(original) + 1)]
+                            + suggestion
+                            + " "
+                        )
+
+                        text_result = interpreter.get_result(
+                            text_result["accepted"]
+                        )
+
+                        correction_result["status"] = "applied"
+
+    return {
+        **prediction,
+        **text_result,
+        "autocorrect": correction_result
+    }
+
 
 torch.set_num_threads(min(4, os.cpu_count() or 2))
 
@@ -108,7 +265,7 @@ print("MediaPipe video hand tracker ready!")
 # HAND DETECTION AND SQUARE CROPPING
 # ========================================
 
-def detect_hand(image):
+def detect_hand(image, return_landmarks=False):
     global last_timestamp
 
     width, height = image.size
@@ -132,7 +289,7 @@ def detect_hand(image):
         )
 
     if not result.hand_landmarks:
-        return None, None
+        return (None, None, None) if return_landmarks else (None, None)
 
     hand = result.hand_landmarks[0]
 
@@ -168,7 +325,16 @@ def detect_hand(image):
         top + side
     ))
 
-    return crop, [x1, y1, x2, y2]
+    bbox = [x1, y1, x2, y2]
+
+    if return_landmarks:
+        landmarks = [
+            (point.x, point.y, point.z)
+            for point in hand
+        ]
+        return crop, bbox, landmarks
+
+    return crop, bbox
 
 
 # ========================================
@@ -244,3 +410,213 @@ def predict(file: UploadFile = File(...)):
         "bbox": bbox,
         "crop_preview": preview_base64
     }
+
+
+# ========================================
+# VIDEO RECOGNITION: 8-FRAME VOTING
+# ========================================
+
+
+def analyze_video(video_path):
+
+    
+    start_time = time.perf_counter()
+
+    # Extract 8 frames from the video
+    frames = sample_video(video_path, num_frames=8)
+    
+    frame_width, frame_height = frames[-1].size
+    last_bbox = None
+
+    voting = TemporalVoting(
+        window_size=8,
+        min_votes=5,
+        min_confidence=0.50
+    )
+
+    BATCH_SIZE = 4
+
+    # ========================================
+    # STEP 1: DETECT AND CROP HANDS
+    # ========================================
+
+    hand_tensors = []
+
+    for frame_index, frame in enumerate(frames):
+        hand_crop, bbox = detect_hand(frame)
+
+        # Use the final sampled frame for the hand box
+        if frame_index == len(frames) - 1:
+            last_bbox = bbox
+
+        if hand_crop is not None:
+            tensor = preprocess(hand_crop)
+            hand_tensors.append(tensor)
+
+    detection_time = time.perf_counter()
+
+    hands_detected = len(hand_tensors)
+
+    if hands_detected == 0:
+        print("No hands detected.")
+
+        return {
+            "hand_detected": False,
+            "label": None,
+            "confidence": 0,
+            "votes": 0,
+            "frames_analyzed": len(frames),
+            "message": "No hand detected",
+            "bbox": last_bbox,
+            "frame_width": frame_width,
+            "frame_height": frame_height,
+        }
+
+    # ========================================
+    # STEP 2: BATCH INFERENCE (4 AT A TIME)
+    # ========================================
+
+    predictions = []
+    stable_label = None
+
+    for start in range(0, hands_detected, BATCH_SIZE):
+
+        batch_tensors = hand_tensors[
+            start:start + BATCH_SIZE
+        ]
+
+        batch = torch.stack(batch_tensors)
+
+        with torch.inference_mode():
+            outputs = model(pixel_values=batch)
+            probabilities = torch.softmax(
+                outputs.logits, dim=1
+            )
+
+        confidences, predicted_ids = torch.max(
+            probabilities, dim=1
+        )
+
+        # ====================================
+        # STEP 3: TEMPORAL VOTING
+        # ====================================
+
+        for predicted_id, confidence in zip(
+            predicted_ids.tolist(),
+            confidences.tolist()
+        ):
+
+            label = CLASS_NAMES[predicted_id]
+
+            if label == "NOTHING":
+                predictions.clear()
+
+            elif confidence >= 0.50:
+                predictions.append(
+                    (label, confidence)
+                )
+
+            result = voting.update(
+                label, confidence
+            )
+
+            if result is not None:
+                stable_label = result
+
+    inference_time = time.perf_counter()
+
+    # ========================================
+    # STEP 4: FINAL RESULT
+    # ========================================
+
+    history = voting.get_history()
+
+    print("\nSLMCI Performance:")
+    print(
+        f"Hand processing: "
+        f"{detection_time - start_time:.2f}s"
+    )
+    print(
+        f"ViT inference + voting: "
+        f"{inference_time - detection_time:.2f}s"
+    )
+    print(
+        f"Total backend processing: "
+        f"{inference_time - start_time:.2f}s"
+    )
+
+    if (
+        stable_label is None
+        or history.count(stable_label) < 5
+    ):
+        return {
+            "hand_detected": True,
+            "label": None,
+            "confidence": 0,
+            "votes": 0,
+            "frames_analyzed": len(frames),
+            "message": "Not enough matching predictions",
+            "bbox": last_bbox,
+            "frame_width": frame_width,
+            "frame_height": frame_height,
+        }
+
+    matching_scores = [
+        confidence
+        for label, confidence in predictions
+        if label == stable_label
+    ]
+
+    average_confidence = (
+        sum(matching_scores) / len(matching_scores)
+    )
+
+    return {
+        "hand_detected": True,
+        "label": stable_label,
+        "confidence": round(
+            average_confidence * 100, 2
+        ),
+        "votes": history.count(stable_label),
+        "frames_analyzed": len(frames),
+        "message": "Prediction complete",
+        "bbox": last_bbox,
+        "frame_width": frame_width,
+        "frame_height": frame_height,
+    }
+
+
+@app.post("/predict-video")
+async def predict_video(
+    video: UploadFile = File(...),
+    session_id: str = Form(...)
+):
+    """
+    Receive a short webcam recording and
+    return its final sign prediction.
+    """
+
+    video_path = None
+
+    try:
+        video_path = await receive_video(
+            video,
+            save_permanently=False
+        )
+
+        result = await run_in_threadpool(
+            analyze_video,
+            video_path
+        )
+
+        return build_text(session_id, result)
+
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error)
+        )
+
+    finally:
+        if video_path is not None:
+            delete_temporary_video(video_path)

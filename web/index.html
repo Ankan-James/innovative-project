@@ -369,6 +369,16 @@
                 </div>
 
                 <div id="prediction">—</div>
+                <div style="margin: 15px 0;">
+                    <div class="result-label">Formed Text</div>
+
+                    <div
+                        id="formedText"
+                        style="font-size: 28px; font-weight: bold;
+                            overflow-wrap: anywhere; margin-top: 8px;">
+                        —
+                    </div>
+                </div>
 
                 <div
                     class="confidence"
@@ -393,24 +403,26 @@
 
             <div class="preview-section">
                 <div class="preview-title">
-                    Hand Image Sent to ViT
+                    8-Frame Voting Results
                 </div>
 
                 <div class="crop-box">
-                    <img
-                        id="cropPreview"
-                        alt="Detected hand crop"
-                    >
+                    <div style="text-align: center;">
+                        <div id="voteCount"
+                            style="font-size: 42px; font-weight: bold; color: #38bdf8;">
+                            0 / 8
+                        </div>
 
-                    <span id="cropPlaceholder">
-                        No hand image yet
-                    </span>
+                        <p style="color: #94a3b8; font-size: 13px;">
+                            Frames agreeing on the final sign
+                        </p>
+                    </div>
                 </div>
 
                 <p class="help">
-                    This preview helps us check whether
-                    the AI is receiving the correct hand image.
-                    Predictions are combined across recent frames.
+                    SLMCI records a short clip and analyzes
+                    8 evenly spaced frames. At least 5
+                    matching predictions are required.
                 </p>
             </div>
         </section>
@@ -420,64 +432,85 @@
 
 <canvas id="captureCanvas" hidden></canvas>
 
+
 <script>
     const video = document.getElementById("camera");
+
     const overlay = document.getElementById("overlay");
     const overlayCtx = overlay.getContext("2d");
 
-    const capture = document.getElementById("captureCanvas");
-    const captureCtx = capture.getContext("2d");
+    const startButton = document.getElementById("startButton");
+    const stopButton = document.getElementById("stopButton");
+
+    const formedText = document.getElementById("formedText");
+    let recognitionSessionId = null;
+
+    const cameraPlaceholder =
+        document.getElementById("cameraPlaceholder");
 
     const prediction = document.getElementById("prediction");
     const confidence = document.getElementById("confidence");
-    const confidenceFill = document.getElementById("confidenceFill");
+    const confidenceFill =
+        document.getElementById("confidenceFill");
+
     const handStatus = document.getElementById("handStatus");
     const indicator = document.getElementById("indicator");
     const status = document.getElementById("status");
+    const voteCount = document.getElementById("voteCount");
 
-    const cropPreview = document.getElementById("cropPreview");
-    const cropPlaceholder = document.getElementById("cropPlaceholder");
-
-    const startButton = document.getElementById("startButton");
-    const stopButton = document.getElementById("stopButton");
-    const cameraPlaceholder = document.getElementById("cameraPlaceholder");
+    // Each clip lasts 2 seconds.
+    const CLIP_DURATION = 1500;
 
     let stream = null;
-    let running = false;
-    let timer = null;
+    let recorder = null;
+    let recordingTimer = null;
     let requestController = null;
-    let missingFrames = 0;
 
-    const predictionHistory = [];
+    let running = false;
+    let selectedMimeType = null;
+    let sessionId = 0;
 
-    function resetResults() {
-        predictionHistory.length = 0;
-        missingFrames = 0;
 
-        prediction.textContent = "—";
-        confidence.textContent = "Model score: —";
-        confidenceFill.style.width = "0%";
-
-        handStatus.textContent = "Waiting for hand detection";
-        indicator.classList.remove("active");
-
-        cropPreview.style.display = "none";
-        cropPreview.removeAttribute("src");
-        cropPlaceholder.style.display = "block";
-
-        overlayCtx.clearRect(
-            0, 0, overlay.width, overlay.height
-        );
-    }
+    // =========================================
+    // CAMERA
+    // =========================================
 
     async function startCamera() {
-        if (running) return;
+        if (running || startButton.disabled) return;
+
+        startButton.disabled = true;
 
         try {
+            if (!navigator.mediaDevices?.getUserMedia) {
+                throw new Error("Webcam access is unavailable.");
+            }
+
+            if (!window.MediaRecorder) {
+                throw new Error(
+                    "This browser does not support video recording."
+                );
+            }
+
+            const supportedTypes = [
+                "video/webm;codecs=vp8",
+                "video/webm",
+                "video/mp4"
+            ];
+
+            selectedMimeType = supportedTypes.find(
+                type => MediaRecorder.isTypeSupported(type)
+            );
+
+            if (!selectedMimeType) {
+                throw new Error(
+                    "No supported video recording format was found."
+                );
+            }
+
             stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    width: { ideal: 960 },
-                    height: { ideal: 720 },
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
                     facingMode: "user"
                 },
                 audio: false
@@ -486,196 +519,351 @@
             video.srcObject = stream;
             await video.play();
 
-            const scale = Math.min(
-                1,
-                960 / Math.max(video.videoWidth, video.videoHeight)
-            );
-
-            const width = Math.round(video.videoWidth * scale);
-            const height = Math.round(video.videoHeight * scale);
-
-            capture.width = width;
-            capture.height = height;
-            overlay.width = width;
-            overlay.height = height;
+            recognitionSessionId = crypto.randomUUID();
+            formedText.textContent = "—";
 
             running = true;
+            const currentSession = ++sessionId;
 
-            startButton.disabled = true;
             stopButton.disabled = false;
             cameraPlaceholder.style.display = "none";
 
             status.textContent =
-                "Camera active. Detecting and tracking your hand...";
+                "Camera active. Starting 8-frame recognition...";
 
-            analyzeLoop();
+            // Begin continuous clip-based recognition.
+            analyzeLoop(currentSession);
 
         } catch (error) {
+            stopCamera();
             status.textContent =
-                "Camera could not start: " + error.message;
-
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                stream = null;
-            }
+                "Camera error: " + error.message;
         }
     }
 
-    async function analyzeLoop() {
-        if (!running) return;
 
-        if (video.readyState >= 2) {
-            await analyzeFrame();
-        }
+    // =========================================
+    // RECORD ONE VIDEO CLIP
+    // =========================================
 
-        // Sample the stream without overlapping requests.
-        if (running) {
-            timer = setTimeout(analyzeLoop, 250);
-        }
-    }
-
-    async function analyzeFrame() {
-        requestController = new AbortController();
-
-        try {
-            captureCtx.drawImage(
-                video,
-                0, 0,
-                capture.width,
-                capture.height
-            );
-
-            const blob = await new Promise(resolve =>
-                capture.toBlob(resolve, "image/jpeg", 0.85)
-            );
-
-            if (!blob || !running) return;
-
-            const form = new FormData();
-            form.append("file", blob, "frame.jpg");
-
-            const response = await fetch("/predict", {
-                method: "POST",
-                body: form,
-                signal: requestController.signal
-            });
-
-            if (!response.ok) {
-                throw new Error(`Server returned ${response.status}`);
-            }
-
-            const result = await response.json();
-
-            if (!running) return;
-
-            overlayCtx.clearRect(
-                0, 0,
-                overlay.width,
-                overlay.height
-            );
-
-            if (!result.hand_detected) {
-                missingFrames++;
-
-                indicator.classList.remove("active");
-                handStatus.textContent = "No hand detected";
-
-                // Ignore one temporary detection failure.
-                if (missingFrames >= 2) {
-                    resetResults();
-                    handStatus.textContent =
-                        "No hand detected - move closer to camera";
-                }
-
+    function recordClip(currentSession) {
+        return new Promise((resolve, reject) => {
+            if (!running || currentSession !== sessionId) {
+                resolve(null);
                 return;
             }
 
-            missingFrames = 0;
+            const chunks = [];
 
-            indicator.classList.add("active");
-            handStatus.textContent = "Hand detected and tracked";
+            try {
+                recorder = new MediaRecorder(stream, {
+                    mimeType: selectedMimeType,
+                    videoBitsPerSecond: 800000
+                });
 
-            // Draw hand bounding box on the live camera.
-            if (result.bbox) {
-                const [x1, y1, x2, y2] = result.bbox;
+                const currentRecorder = recorder;
 
-                overlayCtx.strokeStyle = "#4ade80";
-                overlayCtx.lineWidth = 4;
+                currentRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        chunks.push(event.data);
+                    }
+                };
 
-                overlayCtx.strokeRect(
-                    x1,
-                    y1,
-                    x2 - x1,
-                    y2 - y1
+                currentRecorder.onerror = () => {
+                    clearTimeout(recordingTimer);
+                    reject(new Error("Video recording failed."));
+                };
+
+                currentRecorder.onstop = () => {
+                    clearTimeout(recordingTimer);
+
+                    if (recorder === currentRecorder) {
+                        recorder = null;
+                    }
+
+                    const blob = new Blob(chunks, {
+                        type: currentRecorder.mimeType
+                    });
+
+                    resolve(blob);
+                };
+
+                currentRecorder.start();
+
+                recordingTimer = setTimeout(() => {
+                    if (currentRecorder.state === "recording") {
+                        currentRecorder.stop();
+                    }
+                }, CLIP_DURATION);
+
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+
+
+    // =========================================
+    // SEND VIDEO TO FASTAPI
+    // =========================================
+
+    async function predictVideo(blob) {
+        const form = new FormData();
+        form.append("session_id", recognitionSessionId);
+
+        const format = blob.type.split(";")[0];
+        const extension =
+            format === "video/mp4" ? "mp4" : "webm";
+
+        form.append(
+            "video",
+            blob,
+            `slmci_recording.${extension}`
+        );
+
+        const controller = new AbortController();
+        requestController = controller;
+
+        try {
+            const response = await fetch("/predict-video", {
+                method: "POST",
+                body: form,
+                signal: controller.signal
+            });
+
+            if (!response.ok) {
+                const errorData =
+                    await response.json().catch(() => ({}));
+
+                throw new Error(
+                    errorData.detail ||
+                    `HTTP error ${response.status}`
                 );
             }
 
-            // Display actual image used by the classifier.
-            if (result.crop_preview) {
-                cropPreview.src =
-                    "data:image/jpeg;base64," + result.crop_preview;
+            return await response.json();
 
-                cropPreview.style.display = "block";
-                cropPlaceholder.style.display = "none";
-            }
-
-            // Majority voting over the last five predictions.
-            predictionHistory.push(result.label);
-
-            if (predictionHistory.length > 5) {
-                predictionHistory.shift();
-            }
-
-            const counts = {};
-
-            for (const label of predictionHistory) {
-                counts[label] = (counts[label] || 0) + 1;
-            }
-
-            const stableLabel = Object.keys(counts).reduce(
-                (a, b) => counts[a] >= counts[b] ? a : b
-            );
-
-            prediction.textContent = stableLabel;
-
-            confidence.textContent =
-                `Latest model score: ${result.confidence}%`;
-
-            confidenceFill.style.width =
-                `${Math.min(100, result.confidence)}%`;
-
-            status.textContent =
-                "Analyzing frames. Keep the sign steady.";
-
-        } catch (error) {
-            if (error.name !== "AbortError") {
-                status.textContent =
-                    "Prediction error: " + error.message;
-            }
         } finally {
-            requestController = null;
+            if (requestController === controller) {
+                requestController = null;
+            }
         }
     }
 
+
+    // =========================================
+    // DISPLAY AI RESULTS
+    // =========================================
+
+
+    // =========================================
+    // GREEN HAND DETECTION BOX
+    // =========================================
+
+    function drawHandBox(result) {
+        const videoWidth = video.videoWidth;
+        const videoHeight = video.videoHeight;
+
+        if (!videoWidth || !videoHeight) {
+            return;
+        }
+
+        // Match the canvas to the webcam resolution.
+        if (
+            overlay.width !== videoWidth ||
+            overlay.height !== videoHeight
+        ) {
+            overlay.width = videoWidth;
+            overlay.height = videoHeight;
+        }
+
+        // Remove the previous detection box.
+        overlayCtx.clearRect(
+            0,
+            0,
+            overlay.width,
+            overlay.height
+        );
+
+        if (
+            !result.bbox ||
+            !result.frame_width ||
+            !result.frame_height
+        ) {
+            return;
+        }
+
+        const [x1, y1, x2, y2] = result.bbox;
+
+        // Convert backend coordinates to canvas coordinates.
+        const scaleX = overlay.width / result.frame_width;
+        const scaleY = overlay.height / result.frame_height;
+
+        overlayCtx.strokeStyle = "#4ade80";
+        overlayCtx.lineWidth = 4;
+
+        overlayCtx.strokeRect(
+            x1 * scaleX,
+            y1 * scaleY,
+            (x2 - x1) * scaleX,
+            (y2 - y1) * scaleY
+        );
+    }
+
+
+    function displayResult(result) {
+        
+        // Update the green hand-detection box
+        drawHandBox(result);
+
+        // Display formed text, including applied corrections
+        formedText.textContent = result.text || "—";
+
+        const frames = result.frames_analyzed || 8;
+        const votes = result.votes || 0;
+
+        voteCount.textContent = `${votes} / ${frames}`;
+
+        if (!result.hand_detected) {
+            prediction.textContent = "—";
+            confidence.textContent = "Model score: —";
+            confidenceFill.style.width = "0%";
+
+            handStatus.textContent = "No hand detected";
+            indicator.classList.remove("active");
+
+            status.textContent =
+                "No hand found. Show your hand clearly.";
+
+            return;
+        }
+
+        indicator.classList.add("active");
+
+        if (!result.label) {
+            prediction.textContent = "—";
+            confidence.textContent = "No stable prediction";
+            confidenceFill.style.width = "0%";
+
+            handStatus.textContent =
+                "Hand detected, but predictions disagree";
+
+            status.textContent =
+                "Need at least 5 matching frame predictions.";
+
+            return;
+        }
+
+        // Accepted sign
+        prediction.textContent = result.label;
+
+        confidence.textContent =
+            `Average model score: ${result.confidence}%`;
+
+        confidenceFill.style.width =
+            `${Math.min(100, result.confidence)}%`;
+
+        handStatus.textContent =
+            `Stable sign detected: ${result.label}`;
+
+        status.textContent =
+            `Prediction complete. ${votes} of ${frames} frames agree.`;
+    }
+
+
+    // =========================================
+    // CONTINUOUS RECOGNITION LOOP
+    // =========================================
+
+    async function analyzeLoop(currentSession) {
+        while (running && currentSession === sessionId) {
+            try {
+                status.textContent =
+                    "Recording a 1.5-second video clip...";
+
+                const clip = await recordClip(currentSession);
+
+                if (!running || currentSession !== sessionId) {
+                    break;
+                }
+
+                if (!clip || clip.size === 0) {
+                    throw new Error("Recorded video is empty.");
+                }
+
+                status.textContent =
+                    "Analyzing 8 frames with MediaPipe and ViT...";
+
+                const result = await predictVideo(clip);
+
+                if (!running || currentSession !== sessionId) {
+                    break;
+                }
+
+                displayResult(result);
+
+                // Short pause before recording the next clip.
+                await new Promise(resolve =>
+                    setTimeout(resolve, 300)
+                );
+
+            } catch (error) {
+                if (error.name === "AbortError") {
+                    break;
+                }
+
+                stopCamera();
+
+                status.textContent =
+                    "Video recognition error: " + error.message;
+
+                break;
+            }
+        }
+    }
+
+
+    // =========================================
+    // STOP CAMERA
+    // =========================================
+
     function stopCamera() {
         running = false;
+        sessionId++;
 
-        if (timer) clearTimeout(timer);
-        if (requestController) requestController.abort();
+        clearTimeout(recordingTimer);
+
+        if (requestController) {
+            requestController.abort();
+            requestController = null;
+        }
+
+        if (recorder && recorder.state !== "inactive") {
+            recorder.stop();
+        }
 
         if (stream) {
-            stream.getTracks().forEach(track => track.stop());
+            stream.getTracks().forEach(
+                track => track.stop()
+            );
         }
 
         stream = null;
-
         video.srcObject = null;
+
+        overlayCtx.clearRect(
+            0,
+            0,
+            overlay.width,
+            overlay.height
+        );
 
         startButton.disabled = false;
         stopButton.disabled = true;
         cameraPlaceholder.style.display = "grid";
 
-        resetResults();
+        indicator.classList.remove("active");
+
         status.textContent = "Camera stopped.";
     }
 </script>

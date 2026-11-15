@@ -6,7 +6,9 @@ import cv2
 import torch
 from PIL import Image
 
-from src.camera.frame_sampler import FrameSampler
+import numpy as np
+
+from src.camera.frame_sampler import FrameSampler, sample_video
 from src.vision.hand_detector import HandDetector
 from src.vision.hand_cropper import HandCropper
 from src.inference.vit_classifier import ViTClassifier
@@ -90,6 +92,90 @@ class VideoSignInterpreter:
         ]
 
         return label, confidence.item(), box
+
+    def predict_clip(self, video_path):
+        """
+        Analyze exactly 8 frames from a short video
+        and return one stable sign prediction.
+        """
+
+        # Extract 8 evenly spaced frames
+        frames = sample_video(video_path, num_frames=8)
+
+        # Start fresh for each recording
+        self.voting.reset()
+        self.stable_sign = None
+
+        predictions = []
+        detected_hands = 0
+
+        for frame in frames:
+
+            # sample_video returns PIL RGB images.
+            # predict_frame expects OpenCV BGR images.
+            frame_bgr = cv2.cvtColor(
+                np.asarray(frame),
+                cv2.COLOR_RGB2BGR
+            )
+
+            label, confidence, box = self.predict_frame(
+                frame_bgr
+            )
+
+            if label is None:
+                continue
+
+            detected_hands += 1
+
+            predictions.append({
+                "label": label,
+                "confidence": confidence
+            })
+
+            # Reuse our existing temporal voting module
+            result = self.voting.update(
+                label,
+                confidence
+            )
+
+            if result is not None:
+                self.stable_sign = result
+
+        final_label = self.stable_sign
+
+        if final_label is None:
+            return {
+                "hand_detected": detected_hands > 0,
+                "label": None,
+                "confidence": 0,
+                "votes": 0,
+                "frames_analyzed": len(frames),
+                "message": "Not enough consistent predictions"
+            }
+
+        matching = [
+            p["confidence"]
+            for p in predictions
+            if p["label"] == final_label
+        ]
+
+        votes = len(matching)
+
+        average_confidence = (
+            sum(matching) / votes
+            if votes else 0
+        )
+
+        return {
+            "hand_detected": True,
+            "label": final_label,
+            "confidence": round(
+                average_confidence * 100, 2
+            ),
+            "votes": votes,
+            "frames_analyzed": len(frames),
+            "message": "Prediction complete"
+        }
 
     def process_video(self, video_path):
 
